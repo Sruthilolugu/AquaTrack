@@ -6,9 +6,11 @@ import time
 from predict_future import get_predictions
 
 
+# Page configuration
 st.set_page_config(page_title="AquaTrack", layout="wide")
 
-# CSS for professional button styles
+
+# Custom button styles using CSS
 st.markdown(
     """
     <style>
@@ -28,16 +30,17 @@ st.markdown(
         color: white;
     }
     </style>
-    """,
-    unsafe_allow_html=True,
+    """, unsafe_allow_html=True
 )
+
 
 CRITICAL_THRESHOLD = 3.0  # meters for alerts
 
-# Splash screen + quote
+
+# Splash screen + quote (shown once per session)
 if "splash_displayed" not in st.session_state:
     splash_placeholder = st.empty()
-    combined_html = """
+    splash_html = """
     <div style="
         background: linear-gradient(45deg, #00b4db, #0083b0);
         height: 300px;
@@ -64,72 +67,79 @@ if "splash_displayed" not in st.session_state:
         </div>
     </div>
     """
-    splash_placeholder.markdown(combined_html, unsafe_allow_html=True)
+    splash_placeholder.markdown(splash_html, unsafe_allow_html=True)
     time.sleep(2)
     splash_placeholder.empty()
     st.session_state.splash_displayed = True
-df = pd.read_csv("/Users/sruthiuma/Documents/PrototypeSIH/dataset/monsoon_cleaned.csv")
+
+
+# Load and prepare data
+df = pd.read_csv("/Users/sruthiuma/Desktop/PrototypeSIH/dataset/monsoon_cleaned.csv")
 df["VILLAGE"] = df["VILLAGE"].str.strip()
 df["Date"] = pd.to_datetime(df["Date"])
 
+
+# Initialize session states
 if "dashboard_type" not in st.session_state:
     st.session_state.dashboard_type = None
 
+if "selected_village" not in st.session_state:
+    st.session_state.selected_village = None
+
+
+# Main UI logic
 if st.session_state.dashboard_type is None:
     st.title("AquaTrack - Groundwater Resource Evaluation")
     st.markdown("Monitor water levels in your village in real-time")
 
     villages = sorted(df["VILLAGE"].unique())
-    villages_with_placeholder = ["select village"] +villages
+    options = [""] + villages  # Empty string for no default selection
 
     selected_village = st.selectbox(
         "Select Location",
-        options=villages_with_placeholder,
+        options=options,
         index=0,
-        help="Select your village",
+        format_func=lambda x: "" if x == "" else x,
+        help="Select your location",
     )
 
-    if selected_village == "Select Location":
-        st.warning("Please select a village to continue.")
+    if selected_village == "":
+        st.warning("Please select a location to continue.")
     else:
         st.session_state.selected_village = selected_village
-
         st.markdown("### Select Your Role to Continue")
+
         col1, col2, col3 = st.columns(3)
 
         with col1:
             st.image(
-                "/Users/sruthiuma/Documents/PrototypeSIH/assets/Farmers.jpg",
-                caption="Farmers",
-                use_container_width=True,
-            )
-            st.markdown(
-                "**Farmers**\nI want to cultivate crops and know future water levels."
-            )
-            if st.button("See Levels - Farmers", key="btn_farmers"):
-                st.session_state.dashboard_type = "Farmers"
-
-        with col2:
-            st.image(
-                "/Users/sruthiuma/Documents/PrototypeSIH/assets/policymakers.jpg",
+                "/Users/sruthiuma/Desktop/PrototypeSIH/assets/policymaker1.png",
                 caption="Policy Makers",
                 use_container_width=True,
             )
-            st.markdown(
-                "**Policy Makers**\nI want to plan water management and policies."
-            )
+            st.markdown("**Policy Makers**\nI want to plan water management and policies.")
             if st.button("See Levels - Policy Makers", key="btn_policy"):
                 st.session_state.dashboard_type = "Policy Makers"
 
-        with col3:
+        with col2:
             st.image(
-                "/Users/sruthiuma/Documents/PrototypeSIH/assets/researcher.jpg",
+                "/Users/sruthiuma/Desktop/PrototypeSIH/assets/researcher1.png",
                 caption="Researchers",
                 use_container_width=True,
             )
             st.markdown("**Researchers**\nI want detailed analysis and historical data.")
             if st.button("See Levels - Researchers", key="btn_research"):
                 st.session_state.dashboard_type = "Researchers"
+
+        with col3:
+            st.image(
+                "/Users/sruthiuma/Desktop/PrototypeSIH/assets/farmers2.png",
+                caption="Farmers",
+                use_container_width=True,
+            )
+            st.markdown("**Farmers**\nI want to cultivate crops and know future water levels.")
+            if st.button("See Levels - Farmers", key="btn_farmers"):
+                st.session_state.dashboard_type = "Farmers"
 
 else:
     dashboard_type = st.session_state.dashboard_type
@@ -146,39 +156,80 @@ else:
         time_ranges = []
         if dashboard_type == "Farmers":
             time_ranges = [
-                {"label": "2016-2024", "start": pd.Timestamp("2016-01-01"), "end": pd.Timestamp("2024-12-31")},
-                {"label": "2025-2026 (Predicted)", "start": pd.Timestamp("2025-01-01"), "end": pd.Timestamp("2026-12-31")},
+                {
+                    "label": "2016-2024",
+                    "start": pd.Timestamp("2016-01-01"),
+                    "end": pd.Timestamp("2024-12-31"),
+                },
+                {
+                    "label": "2025-2026 (Predicted)",
+                    "start": pd.Timestamp("2025-01-01"),
+                    "end": pd.Timestamp("2026-12-31"),
+                },
             ]
         else:
             st.sidebar.subheader("Select Past Data Range")
-            past_start = pd.Timestamp(st.sidebar.date_input("Past Start Date", village_data["Date"].min()))
-            past_end = pd.Timestamp(st.sidebar.date_input("Past End Date", village_data["Date"].max()))
-            time_ranges.append({"label": f"Past ({past_start.year}-{past_end.year})", "start": past_start, "end": past_end})
+            past_start = pd.Timestamp(
+                st.sidebar.date_input("Past Start Date", village_data["Date"].min())
+            )
+            past_end = pd.Timestamp(
+                st.sidebar.date_input("Past End Date", village_data["Date"].max())
+            )
+            time_ranges.append(
+                {
+                    "label": f"Past ({past_start.year}-{past_end.year})",
+                    "start": past_start,
+                    "end": past_end,
+                }
+            )
 
             st.sidebar.subheader("Select Future Prediction Range")
-            future_start = pd.Timestamp(st.sidebar.date_input("Future Start Date", datetime(2025, 1, 1)))
-            future_end = pd.Timestamp(st.sidebar.date_input("Future End Date", datetime(2026, 12, 31)))
-            time_ranges.append({"label": f"Future ({future_start.year}-{future_end.year})", "start": future_start, "end": future_end})
+            future_start = pd.Timestamp(
+                st.sidebar.date_input("Future Start Date", datetime(2025, 1, 1))
+            )
+            future_end = pd.Timestamp(
+                st.sidebar.date_input("Future End Date", datetime(2026, 12, 31))
+            )
+            time_ranges.append(
+                {
+                    "label": f"Future ({future_start.year}-{future_end.year})",
+                    "start": future_start,
+                    "end": future_end,
+                }
+            )
 
         for tr in time_ranges:
             start, end, label = tr["start"], tr["end"], tr["label"]
+
             if "Predicted" in label or "Future" in label:
                 data = get_predictions(selected_village, start, end)
                 value_col = "Predicted_DTWl"
             else:
-                data = village_data[(village_data["Date"] >= start) & (village_data["Date"] <= end)]
+                data = village_data[
+                    (village_data["Date"] >= start) & (village_data["Date"] <= end)
+                ]
                 value_col = "DTWL"
 
             st.subheader(f"{label} Groundwater Levels")
             if not data.empty:
                 min_val = data[value_col].min()
                 if min_val < CRITICAL_THRESHOLD:
-                    st.error(f"⚠️ Alert: Critical groundwater level! Minimum depth {min_val:.2f}m below threshold.")
+                    st.error(
+                        f"⚠️ Alert: Critical groundwater level! Minimum depth {min_val:.2f}m below threshold."
+                    )
                 else:
-                    st.success(f"✅ Groundwater level within safe limits. Minimum depth {min_val:.2f}m.")
+                    st.success(
+                        f"✅ Groundwater level within safe limits. Minimum depth {min_val:.2f}m."
+                    )
 
                 fig, ax = plt.subplots(figsize=(10, 4))
-                ax.plot(data["Date"], data[value_col], marker="o", color="#1f77b4", label=label)
+                ax.plot(
+                    data["Date"],
+                    data[value_col],
+                    marker="o",
+                    color="#1f77b4",
+                    label=label,
+                )
                 ax.set_facecolor("#ffffff")
                 ax.grid(True, linestyle="--", alpha=0.6)
                 ax.set_xlabel("Date", color="#000000")
@@ -196,13 +247,27 @@ else:
                 )
 
                 recharge_data = data.sort_values("Date").copy()
-                recharge_data["Recharge"] = recharge_data[value_col].shift(1) - recharge_data[value_col]
+                recharge_data["Recharge"] = (
+                    recharge_data[value_col].shift(1) - recharge_data[value_col]
+                )
                 if (end - start).days > 90:
-                    recharge_data = recharge_data.set_index("Date")[["Recharge"]].resample("M").sum().reset_index()
+                    recharge_data = (
+                        recharge_data.set_index("Date")[["Recharge"]]
+                        .resample("M")
+                        .sum()
+                        .reset_index()
+                    )
+
                 st.subheader(f"Estimated Recharge ({label})")
                 if not recharge_data.empty:
                     fig_r, ax_r = plt.subplots(figsize=(10, 4))
-                    ax_r.plot(recharge_data["Date"], recharge_data["Recharge"], marker="o", color="#2ca02c", label="Recharge (m)")
+                    ax_r.plot(
+                        recharge_data["Date"],
+                        recharge_data["Recharge"],
+                        marker="o",
+                        color="#2ca02c",
+                        label="Recharge (m)",
+                    )
                     ax_r.axhline(0, color="#888888", linestyle="--", linewidth=1)
                     ax_r.set_xlabel("Date")
                     ax_r.set_ylabel("Recharge (m)")
@@ -225,8 +290,6 @@ else:
             else:
                 st.warning(f"No data available for {label}.")
 
-   #if st.button("Back to Role Selection"):
-      # // st.session_state.dashboard_type = None
     if st.button("Back to Role Selection"):
-      st.session_state['page'] = 'role_selection'
-      st.session_state['dashboard_type'] = None
+        st.session_state['page'] = 'role_selection'
+        st.session_state.dashboard_type = None
